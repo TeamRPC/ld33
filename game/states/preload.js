@@ -13,12 +13,14 @@ Preload.prototype = {
     this.load.onLoadComplete.addOnce(this.onLoadComplete, this);
     this.load.setPreloadSprite(this.asset);
     this.load.image('menu', 'assets/menu.jpg');
+    this.load.image('win', 'assets/win2.jpg');
+    this.load.image('lose', 'assets/fail.jpg');
     this.load.image('background', 'assets/background.jpg');
-    this.load.image('thellow1', 'assets/thellow1.png');
-    this.load.image('thellow2', 'assets/thellow2.png');
-    this.load.image('thellow3', 'assets/thellow3.png');
+    this.load.spritesheet('thellow', 'assets/thellows.png', 76, 84, 3);
     this.load.image('gameover', 'assets/gameover.jpg');
     this.load.spritesheet('cave', 'assets/cave_6.png', 16, 16, 209);
+    this.load.spritesheet('human', 'assets/theHuman.png', 30, 30, 8);
+    //this.load.audio('theme', ['assets/song-wdrums.mp3']);
 
   },
   create: function() {

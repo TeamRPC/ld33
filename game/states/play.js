@@ -4,7 +4,9 @@
   Play.prototype = {
     create: function() {
       
-      
+      this.music = this.game.add.audio('theme');
+      this.music.play();
+      this.endgame_counter = 0;
       // debug mode
       //this.debugger = new Phaser.Debug(this.game);
       
@@ -26,19 +28,30 @@
       this.game.physics.arcade.gravity.y = 450; // 450
       
       // add player
-      this.player_health = 9;
-      this.player_speed = 600;
+      this.player_is_airborne = false;
+      this.player_health = 1;
+      this.player_health_max = 9;
+      this.player_speed = 500;
       this.player_last_collision = null;
       this.player_last_collision_time = 0;
       this.player_collision_penalty_time = 66;
-      this.player_penalty_speed = 200;
-      this.player = this.game.add.sprite(this.game.width / 2, this.game.height / 2, 'thellow2');
+      this.player_start_time = 100;
+      this.player_penalty_speed = 300;
+      this.player_fast_speed = 600;
+      this.player_start_speed = 200;
+      //this.player = this.game.add.sprite(this.game.width / 2, this.game.height / 2, 'thellow');
+      this.player = this.foreground.create(this.game.width / 2, this.game.height / 2, 'thellow');
+      this.player.frame = 0;
+
       this.game.physics.arcade.enable(this.player);
       this.player.body.collideWorldBounds = true;
       this.player.anchor.set(0.5, 0.5);
       
-      this.player.jump_timer = this.game.time.now + 1050; // dont let the player jump right away
-      this.player.jump_reset = 1;
+      this.player_last_jump_time = 0;
+      this.player_jump_timer = 33; // a jump can only last a max of x frames
+      this.player_jump_letgo = 0;
+      this.player_jump_reset = 1;
+      this.player_jump_velocity = -360;
       
       // make the camera follow the player
       this.game.camera.bounds = 0, 0, 900, 200;
@@ -46,11 +59,21 @@
       this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON, {x: 200, y: 0});
       //game.camera.follow(ufo, Phaser.Camera.FOLLOW_PLATFORMER);
 
-      // add meatbag
-      this.meatbag = this.foreground.create(this.player.x + 600, this.player.y, 'human');
+      //
+      // ADD MEATBAG
+      //
+      this.meatbag_backwards = 1;
+      this.meatbag_speed = 400;
+      this.meatbag = this.foreground.create(this.player.x + 1500, this.player.y, 'human');
+      var walk = this.meatbag.animations.add('run');
+      this.meatbag.animations.play('run', 20, true);
+      this.meatbag.scale = new Phaser.Point(-1, 1);
+      
       this.game.physics.arcade.enable(this.meatbag);
       this.meatbag.body.collideWorldBounds = true;
       this.meatbag.anchor.set(0.5, 0.5);
+      
+      
       this.meatbag.body.velocity.x = this.player_speed - 10;
 
       
@@ -61,7 +84,7 @@
       this.game.score = 0;
       this.game.score_multiplier = 0;
       this.score_hit = false;
-      this.score_text = this.game.add.text(20, 20, "Evolution Stage: 1\nCheckpoint: 9", {
+      this.score_text = this.game.add.text(20, 20, "Monstrosity: 1 of 9", {
         font: "26px Arial",
         fill: "#ffaa00",
         align: "left"
@@ -94,17 +117,45 @@
       // controls
       this.jump_button = this.game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
       
-      // player running
-      // normal speed or reduced speed if recent wall collision
-      if (this.game_time >= this.player_last_collision_time + this.player_collision_penalty_time) {
-        //console.log('fast ' + console.log(this.player_last_collision_time + ' ' + this.player_collision_penalty_time));
-        this.player.body.velocity.x = this.player_speed;
+      //
+      // MEATBAG TURNAROUND
+      //
+      
+      
+      //
+      // PLAYER MOVEMENT SPEEDS
+      //
+      
+      // walk if game just starting
+      if (this.game_time <= this.player_start_time) {
+        this.player.body.velocity.x = this.player_start_speed;
+        this.meatbag.body.velocity.x = (this.player_start_speed - this.player_start_speed - this.player_start_speed);
       }
       else {
-        //console.log('slow');
-        this.player.body.velocity.x = this.player_penalty_speed;
+        // run since game is running
+        
+        // normal speed or reduced speed if recent wall collision
+        if (this.game_time >= this.player_last_collision_time + this.player_collision_penalty_time) {
+          //console.log('fast ' + console.log(this.player_last_collision_time + ' ' + this.player_collision_penalty_time));
+          this.player.body.velocity.x = this.player_speed;
+        }
+        else {
+          // go slow since its the start of game
+          this.player.body.velocity.x = this.player_penalty_speed;
+        }
+        // meatbag go fast
+        if (this.endgame_counter != 4) {
+          this.meatbag.body.velocity.x = this.meatbag_speed;
+        }
+        else {
+          this.meatbag.body.velocity.x = 0;
+        }
+        
+        if (this.meatbag_backwards) {
+          this.meatbag_backwards = 0;
+          this.meatbag.scale = new Phaser.Point(1, 1);
+        }
       }
-      
       
       
       
@@ -117,19 +168,83 @@
       }
       
       
+      // 
+      // JUMP LOGIC
+      //
+      // continue a jump if one is already in progress // ccc
+      // if (!this.player.body.onFloor())
+      // {
+      //   console.log('1')
+      //   if (this.jump_button.isDown &&
+      //       this.player_last_jump_time + this.player_jump_timer >= this.game_time &&
+      //       this.player_jump_letgo == 0)
+      //   {
+      //     console.log('2')
+      //     this.player.body.velocity.y = this.player_jump_velocity;
+      //   }
+      //   else {
+      //     console.log('3')
+      //     // airborne but not holding down button
+      //     // run velocity.y = 0 one time per jump
+      //     // dont allow resuming jump
+      //     if (this.player_jump_letgo == 0) {
+      //       console.log('4');
+      //       this.player_jump_letgo = 1;
+      //       this.player.body.velocity.y = 0;
+      //     }
+      //   }
+      // }
+        
+        
+      // else {
+      //   // not airborne
+      //   if (this.jump_button.isDown) {
+      //     this.player_jump_letgo = 1;
+      //     if (this.player_jump_reset) {
+      //       // not airborne and jump reset
+      //       // begin jump
+      //       this.player_last_jump_time = this.game_time;
+      //       this.player.body.velocity.y = this.player_jump_velocity;
+      //       //console.log('2')
+      //     }
+      //   }
+      //   else {
+      //     // jump button is not down
+      //     // no-op
+      //   }
+      // }
+        
+        
+        
+        
+        
+        
+        
+      // allow another jump (reset) once spacebar is released
+      // but only let it reset if player is on or near the ground
+      if ((this.player.body.y > this.game.world.ground - 150) &&
+          !this.jump_button.isDown)
+      {
+        this.player_jump_reset = 1;
+      }
+      
+      
       // jump
       if (this.jump_button.isDown &&
           this.player.body.onFloor() && 
-          this.game.time.now > this.player.jump_timer &&
-          this.player.jump_reset)
+          this.game_time > this.player_jump_timer &&
+          this.player_jump_reset)
       {
         this.player.body.velocity.y = -360;
-        this.player.jump_reset = 0;
+        this.player_jump_reset = 0;
         //this.player.jump_timer = this.game.time.now + 250;
       }
       
       
-      // background tiling
+      
+      //
+      // BACKGROUND TILING
+      //
       // if right side of background is inside camera view, create a new background
       if (this.background.children[this.background_count].x < (this.game.camera.view.x + 50)) {
         //console.log('backgrund edge is visible to camera');
@@ -163,19 +278,30 @@
       
       
 
-      // collisions
+      // 
+      // wall collisions
+      //
       var count = this.walls.children.length;
       for(var i = 0; i < count; i++) {
         var boundsA = this.walls.children[i].getBounds();
         var boundsB = this.player.getBounds();
         
-        // avoid duplicate collisions
+        // avoid duplicate wall collisions
         if (Phaser.Rectangle.intersects(boundsA, boundsB)) {
           if (this.walls.children[i] != this.player_last_collision) {
             this.player_last_collision = this.walls.children[i];
             this.onCollide('wall');
           }
         }
+      }
+      
+      
+      //
+      // meatbag collisions
+      //
+      if (Phaser.Rectangle.intersects(this.meatbag.getBounds(), this.player.getBounds())) {
+        //console.log('matbag adsfo colosion')
+        this.onCollide('meatbag');
       }
       
       // text overlay
@@ -185,8 +311,7 @@
       if (this.seconds_elapsed != this.last_game_time) {
         
         // score
-        this.game_time_text.setText("Time: " + parseInt(this.game_time / 60) +
-        '\nspeed ' + this.player.body.velocity.x);
+        this.game_time_text.setText("Time: " + parseInt(this.game_time / 60));
         this.last_game_time = this.seconds_elapsed;
       }
       
@@ -223,31 +348,81 @@
     
     onCollide: function(object) {
       
-      // player colliding with wall
+      //player colliding with wall
       if (object == 'wall') {
-        this.player_health --;
         
-        // game over if all health gone
-        if (this.player_health < 1) {
-          console.log('game over');
-          this.game.state.start('gameover');
+        if (this.player_health >= this.player_health_max) {
+          // full monstrocity. ignore walls
+          
+          this.foreground.create('cave')
+          var explosion = this.foreground.create(this.player_last_collision.x, this.player_last_collision.y, 'cave');
+          explosion.frame = 126;
+          explosion.scale = new Phaser.Point(6, 6);
+          // @todo sound
+          //this.player_last_collision.destroy(); // <-- bugged
+          
+          this.endgame_counter += 1;
+          
+          // endgame
+          if (this.endgame_counter == 4) {
+            this.game.state.start('gameover');
+          }
         }
-        
-        // update text
         else {
-          this.score_text.setText("Health: " + this.player_health + "\nScore: "+ this.player_score);
+          // not full monstrosity. walls hurt you.
+          this.player_health -= 1;
+        
+          // game over if all health gone
+          if (this.player_health < 1) {
+            console.log('game over');
+            this.game.state.start('fail');
+          }
+          
+          // update text
+          else {
+            this.score_text.setText("Monstrosity: " + this.player_health + " of " + this.player_health_max);
+          }
+          
+          // slow down player temporarily
+          this.player_last_collision_time = this.game_time;
         }
-        
-        // slow down player temporarily
-        this.player_last_collision_time = this.game_time;
-        
-        
       }
+        
       
       // player colliding with human
-      else if (object == 'meatbag' || object == 'human') {
-        this.player_score ++;
-        this.meatbag.destroy();
+      if (object == 'meatbag' || object == 'human') {
+        
+        
+        if (this.player_health >= this.player_health_max) {
+          // final monstrosity stage, invulnerable to walls
+          this.player.tint = 0xff0000;
+          this.meatbag.x = this.player.x - 800; // remove meatbag
+          this.meatbag.destroy();
+          this.score_text.setText("FULL MONSTROSITY!\nhint: monster bosses ignore scenery");
+          
+          
+          
+        }
+        else {
+          // monstrosity 1-8, walls hurt you
+          this.player.tint = 0xffffff;
+          this.meatbag.x = this.player.x + 800;
+          
+          this.player_health += 1;
+          //this.meatbag.destroy();
+          
+          this.score_text.setText("Monstrosity: " + this.player_health + " of " + this.player_health_max);
+          
+          if (this.player_health >= 0 && this.player_health < 4) {
+            this.player.frame = 0;
+          }
+          else if (this.player_health > 3 && this.player_health < 7) {
+            this.player.frame = 2;
+          }
+          else if (this.player_health > 6) {
+            this.player.frame = 1;
+          }
+        }
       }
     },
     
